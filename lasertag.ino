@@ -3,7 +3,6 @@
 #include <Button.h>
 #include <IRremote.h>
 
-
 #define PULLUP false
 #define INVERT false
 #define DEBOUNCE_MS 20     //A debounce time of 20 milliseconds usually works well for tactile button switches.
@@ -21,7 +20,6 @@ Button triggerBtn(TRIGGER_PIN, PULLUP, INVERT, DEBOUNCE_MS);    //Declare the bu
 Button upBtn(UP_PIN, PULLUP, INVERT, DEBOUNCE_MS);
 Button downBtn(DOWN_PIN, PULLUP, INVERT, DEBOUNCE_MS);
 Button enterBtn(ENTER_PIN, PULLUP, INVERT, DEBOUNCE_MS);
-
 LiquidCrystal lcd(12, 11, 10, 9, 8, 7);
 
 // default settings
@@ -34,15 +32,17 @@ boolean menuActivated = true;
 byte subMenu = 0;
 
 struct PACKET {
-  byte TEAM;
-  byte PLAYER;
-  byte DAMAGE;
+  uint8_t TEAM;
+  uint8_t PLAYER;
+  uint8_t DAMAGE;
 };
 
 struct PACKET LASER;
 
+uint16_t dataPacket;
+
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   lcd.begin(16, 2);
   lcd.clear();
   lcd.home();
@@ -57,9 +57,9 @@ void setup() {
   delay(1000);
   lcd.clear();
 
-  LASER.TEAM = 0;
-  LASER.PLAYER = 0;
-  LASER.DAMAGE = 20;
+  LASER.TEAM = 3;
+  LASER.PLAYER = 27;
+  LASER.DAMAGE = 8;
 }
 
 
@@ -203,10 +203,21 @@ void displayMenu() {
       case 2:
         menuActivated = false;
         lcd.clear();
+        dataPacket = (LASER.TEAM<<9) | (LASER.PLAYER<<4) | LASER.DAMAGE;
         return;
     }
   }
+}
 
+void cooldown() {
+  for (float countdown = 0; countdown < 100; countdown = countdown + 0.1) {
+    digitalWrite(BUZZER_PIN, HIGH);
+    delayMicroseconds(countdown*5);
+    digitalWrite(BUZZER_PIN, LOW);
+    delayMicroseconds(countdown);
+    TEMP = 100-countdown;
+    updateDisplay();
+  }
 }
 
 void loop() {
@@ -216,10 +227,10 @@ void loop() {
   triggerBtn.read();                    //Read the button
 
   if (triggerBtn.isPressed()) {       //If the button was pressed, change the LED state
-    irsend.sendSony(AMMO, 16); delay(15);
+    irsend.sendSony(dataPacket, 11); delay(15);
     laserSound();
     AMMO -= 1;
-    TEMP = TEMP + 1.5;
+    TEMP = TEMP + 2;
     if (TEMP > 100) cooldown();
   }
   if (AMMO == 0) {
@@ -230,15 +241,5 @@ void loop() {
   if (TEMP < 0) TEMP = 0;
 }
 
-void cooldown() {
-  for (float countdown = 100; countdown >= 0; countdown = countdown - 0.1) {
-    digitalWrite(BUZZER_PIN, HIGH);
-    delayMicroseconds(countdown * 2);
-    digitalWrite(BUZZER_PIN, LOW);
-    delayMicroseconds(countdown * 10);
-    TEMP = countdown;
-    updateDisplay();
-  }
-}
 
 
